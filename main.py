@@ -1,42 +1,76 @@
 import os
+import asyncio
 from urllib.parse import quote
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse
-from fastmcp import FastMCP
+from mcp.server import Server
+from mcp.server.sse import SseServerTransport
+import mcp.types as types
 
-# Initialize FastMCP directly from its dedicated library
-mcp_server = FastMCP(
-    name="free-uncensored-imagegen",
-    title="Free Uncensored Image Generator"
-)
+# Initialize the official core MCP Server
+mcp_server = Server("free-uncensored-imagegen")
+sse_transport = SseServerTransport("/messages")
 
-# Define your image generation tool using the standard decorator
-@mcp_server.tool(
-    name="generate_image",
-    description="Generates an image from a detailed text prompt using free cloud APIs."
-)
-async def generate_image(prompt: str) -> str:
+# Register the image generation tool
+@mcp_server.list_tools()
+async def handle_list_tools():
+    return [
+        types.Tool(
+            name="generate_image",
+            description="Generates an image from a detailed text prompt using free cloud APIs.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "prompt": {"type": "string", "description": "The exact visual prompt to render."}
+                },
+                "required": ["prompt"]
+            }
+        )
+    ]
+
+@mcp_server.call_tool()
+async def handle_call_tool(name: str, arguments: dict):
+    if name != "generate_image":
+        raise ValueError(f"Unknown tool: {name}")
+    
+    prompt = arguments.get("prompt")
     if not prompt:
-        return "Error: Prompt cannot be empty."
+        return [types.TextContent(type="text", text="Error: Prompt is empty.")]
 
     try:
         # URL-encode the prompt string to handle spaces safely
         encoded_prompt = quote(prompt)
         
-        # Build the Pollinations URL with safety filters explicitly turned off
+        # Pull from the public Pollinations architecture with filters dropped
         image_url = f"https://pollinations.ai{encoded_prompt}?enhance=false&safe=false"
         
         # Return Markdown to instantly render the image inside your local chat UI
-        return f"Here is your generated image:\n![Generated Image]({image_url})"
+        return [
+            types.TextContent(
+                type="text", 
+                text=f"Here is your generated image:\n![Generated Image]({image_url})"
+            )
+        ]
             
     except Exception as e:
-        return f"An error occurred: {str(e)}"
+        return [types.TextContent(type="text", text=f"An error occurred: {str(e)}")]
 
-# Create your main FastAPI application
-app = FastAPI(title="Main API Entrypoint")
+# Initialize FastAPI application container
+app = FastAPI(title="Free Uncensored ImageGen Server")
 
-# Mount the FastMCP application instance directly into your main FastAPI app
-app.mount("/mcp", mcp_server.fastapi_app)
+# Handle standard Server-Sent Events (SSE) lifecycles
+@app.get("/sse")
+async def sse_endpoint(request: Request):
+    async with sse_transport.connect_scope(request) as scope:
+        await mcp_server.run(
+            scope.read_stream,
+            scope.write_stream,
+            mcp_server.create_initialization_options()
+        )
+
+@app.post("/messages")
+async def messages_endpoint(request: Request):
+    await sse_transport.handle_post_request(request)
 
 @app.get("/")
 async def root():
