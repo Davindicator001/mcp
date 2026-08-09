@@ -1,10 +1,20 @@
 from urllib.parse import quote
 from fastapi.middleware.cors import CORSMiddleware
 from mcp.server import MCPServer
-
+from mcp.server.transport_security import TransportSecuritySettings
+ 
 # Initialize the MCP server
 mcp_server = MCPServer("free-uncensored-imagegen")
 
+# The SSE transport validates the Host header by default (DNS-rebinding
+# protection) and rejects any host not in this list. Add your Render
+# domain here, or requests will fail with "Request validation failed".
+transport_security = TransportSecuritySettings(
+    enable_dns_rebinding_protection=True,
+    allowed_hosts=["mcp-0go8.onrender.com", "localhost", "127.0.0.1"],
+    allowed_origins=["*"],
+)
+ 
 
 @mcp_server.tool()
 async def generate_image(prompt: str) -> str:
@@ -25,10 +35,11 @@ async def generate_image(prompt: str) -> str:
     return f"Here is your generated image:\n![Generated Image]({image_url})"
 
 
+
 # sse_app() returns a ready-to-run Starlette app with /sse and /messages/
 # routes already wired to this server instance.
-app = mcp_server.sse_app()
-
+app = mcp_server.sse_app(transport_security=transport_security)
+ 
 # Enable CORS for desktop clients
 app.add_middleware(
     CORSMiddleware,
@@ -37,3 +48,4 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+ 
