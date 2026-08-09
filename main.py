@@ -1,63 +1,34 @@
-import os
-import asyncio
 from urllib.parse import quote
-from fastapi import FastAPI, Request
-from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
-from mcp.server import Server
-from mcp.server.sse import SseServerTransport
-import mcp.types as types
+from mcp.server import MCPServer
 
-# Initialize the low-level base MCP Server 
-mcp_server = Server("free-uncensored-imagegen")
+# Initialize the MCP server
+mcp_server = MCPServer("free-uncensored-imagegen")
 
-# FIX: SseServerTransport MUST be a relative path string
-sse_transport = SseServerTransport("/messages")
 
-# Register the available tools list
-async def on_list_tools(params) -> types.ListToolsResult:
-    return types.ListToolsResult(
-        tools=[
-            types.Tool(
-                name="generate_image",
-                description="Generates an image from a detailed text prompt using free cloud APIs.",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "prompt": {"type": "string", "description": "The exact visual prompt to render."}
-                    },
-                    "required": ["prompt"]
-                }
-            )
-        ]
-    )
+@mcp_server.tool()
+async def generate_image(prompt: str) -> str:
+    """Generates an image from a detailed text prompt using free cloud APIs.
 
-@mcp_server.call_tool()
-async def on_call_tool(name: str, arguments: dict | None) -> list[types.TextContent]:
-    if name != "generate_image":
-        raise ValueError(f"Unknown tool: {name}")
- 
-    if not arguments or "prompt" not in arguments:
+    Args:
+        prompt: The exact visual prompt to render.
+    """
+    if not prompt:
         raise ValueError("Error: Prompt was empty.")
- 
-    prompt = arguments["prompt"]
- 
+
     # URL-encode the string to protect spaces during web-routing
     encoded_prompt = quote(prompt)
- 
+
     # Pull from Pollinations' image generation endpoint (default safety settings)
     image_url = f"https://pollinations.ai{encoded_prompt}?enhance=false&safe=false"
- 
-    # Return Markdown schema syntax to natively display the image in your client's window
-    return [
-        types.TextContent(
-            type="text",
-            text=f"Here is your generated image:\n![Generated Image]({image_url})"
-        )
-    ]
-# Initialize FastAPI application container
-app = FastAPI(title="Pollinations ImageGen MCP Server")
- 
+
+    return f"Here is your generated image:\n![Generated Image]({image_url})"
+
+
+# sse_app() returns a ready-to-run Starlette app with /sse and /messages/
+# routes already wired to this server instance.
+app = mcp_server.sse_app()
+
 # Enable CORS for desktop clients
 app.add_middleware(
     CORSMiddleware,
@@ -66,27 +37,3 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
- 
- 
-# Handle standard Server-Sent Events (SSE) lifecycle
-@app.get("/sse")
-async def sse_endpoint(request: Request):
-    async with sse_transport.connect_sse(
-        request.scope, request.receive, request._send
-    ) as (read_stream, write_stream):
-        await mcp_server.run(
-            read_stream,
-            write_stream,
-            mcp_server.create_initialization_options()
-        )
- 
- 
-@app.post("/messages")
-async def messages_endpoint(request: Request):
-    await sse_transport.handle_post_message(request.scope, request.receive, request._send)
- 
- 
-@app.get("/")
-async def root():
-    return RedirectResponse(url="/docs")
-    return RedirectResponse(url="/docs")
