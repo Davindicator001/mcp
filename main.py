@@ -3,15 +3,18 @@ import asyncio
 from urllib.parse import quote
 from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse
+from fastapi.middleware.cors import CORSMiddleware
 from mcp.server import Server
 from mcp.server.sse import SseServerTransport
 import mcp.types as types
 
-# Initialize the official low-level core MCP Server instance
+# Initialize the low-level base MCP Server 
 mcp_server = Server("free-uncensored-imagegen")
-sse_transport = SseServerTransport("https://mcp-0go8.onrender.com/sse")
 
-# Handle incoming list_tools requests programmatically
+# FIX: SseServerTransport MUST be a relative path string
+sse_transport = SseServerTransport("/messages")
+
+# Register the available tools list
 async def on_list_tools(params) -> types.ListToolsResult:
     return types.ListToolsResult(
         tools=[
@@ -29,18 +32,18 @@ async def on_list_tools(params) -> types.ListToolsResult:
         ]
     )
 
-# Handle runtime client tool execution requests programmatically
+# Handle runtime client tool execution requests
 async def on_call_tool(name: str, arguments: dict | None) -> types.CallToolResult:
     if name != "generate_image":
         return types.CallToolResult(
-            isError=True,
+            isError=True, 
             content=[types.TextContent(type="text", text=f"Unknown tool: {name}")]
         )
     
     if not arguments or "prompt" not in arguments:
         return types.CallToolResult(
-            isError=True,
-            content=[types.TextContent(type="text", text="Error: Prompt parameter was empty.")]
+            isError=True, 
+            content=[types.TextContent(type="text", text="Error: Prompt was empty.")]
         )
         
     prompt = arguments["prompt"]
@@ -64,18 +67,27 @@ async def on_call_tool(name: str, arguments: dict | None) -> types.CallToolResul
             
     except Exception as e:
         return types.CallToolResult(
-            isError=True,
+            isError=True, 
             content=[types.TextContent(type="text", text=f"An error occurred: {str(e)}")]
         )
 
-# Direct the core server handlers to listen for explicit incoming MCP network tools payloads
+# Attach mapped functions to the server instance
 mcp_server.list_tools_handler = on_list_tools
 mcp_server.call_tool_handler = on_call_tool
 
-# Initialize the FastAPI web server wrapper 
+# Initialize FastAPI application container
 app = FastAPI(title="Free Uncensored ImageGen Server")
 
-# Securely bind the low-level Server-Sent Events lifecycles into FastAPI network pathways
+# CRITICAL FIX FOR DESKTOP CLIENTS: Enable full CORS permissions
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Handle standard Server-Sent Events (SSE) lifecycles
 @app.get("/sse")
 async def sse_endpoint(request: Request):
     async with sse_transport.connect_scope(request) as scope:
