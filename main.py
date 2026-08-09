@@ -74,11 +74,11 @@ async def on_call_tool(name: str, arguments: dict | None) -> types.CallToolResul
 # Attach mapped functions to the server instance
 mcp_server.list_tools_handler = on_list_tools
 mcp_server.call_tool_handler = on_call_tool
-
+ 
 # Initialize FastAPI application container
-app = FastAPI(title="Free Uncensored ImageGen Server")
-
-# CRITICAL FIX FOR DESKTOP CLIENTS: Enable full CORS permissions
+app = FastAPI(title="Pollinations ImageGen MCP Server")
+ 
+# Enable CORS for desktop clients
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -86,21 +86,28 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Handle standard Server-Sent Events (SSE) lifecycles
+ 
+ 
+# Handle standard Server-Sent Events (SSE) lifecycle
 @app.get("/sse")
 async def sse_endpoint(request: Request):
-    async with sse_transport.connect_scope(request) as scope:
+    async with sse_transport.connect_sse(
+        request.scope, request.receive, request._send
+    ) as (read_stream, write_stream):
         await mcp_server.run(
-            scope.read_stream,
-            scope.write_stream,
+            read_stream,
+            write_stream,
             mcp_server.create_initialization_options()
         )
-
+ 
+ 
 @app.post("/messages")
 async def messages_endpoint(request: Request):
-    await sse_transport.handle_post_request(request)
-
+    await sse_transport.handle_post_message(request.scope, request.receive, request._send)
+ 
+ 
 @app.get("/")
+async def root():
+    return RedirectResponse(url="/docs")
 async def root():
     return RedirectResponse(url="/docs")
