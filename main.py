@@ -32,49 +32,29 @@ async def on_list_tools(params) -> types.ListToolsResult:
         ]
     )
 
-# Handle runtime client tool execution requests
-async def on_call_tool(name: str, arguments: dict | None) -> types.CallToolResult:
+@mcp_server.call_tool()
+async def on_call_tool(name: str, arguments: dict | None) -> list[types.TextContent]:
     if name != "generate_image":
-        return types.CallToolResult(
-            isError=True, 
-            content=[types.TextContent(type="text", text=f"Unknown tool: {name}")]
-        )
-    
-    if not arguments or "prompt" not in arguments:
-        return types.CallToolResult(
-            isError=True, 
-            content=[types.TextContent(type="text", text="Error: Prompt was empty.")]
-        )
-        
-    prompt = arguments["prompt"]
-
-    try:
-        # URL-encode the string to protect spaces during web-routing
-        encoded_prompt = quote(prompt)
-        
-        # Pull directly from Pollinations' open image pipeline with content checks bypassed
-        image_url = f"https://pollinations.ai{encoded_prompt}?enhance=false&safe=false"
-        
-        # Return Markdown schema syntax to natively display the image in your client's window
-        return types.CallToolResult(
-            content=[
-                types.TextContent(
-                    type="text", 
-                    text=f"Here is your generated image:\n![Generated Image]({image_url})"
-                )
-            ]
-        )
-            
-    except Exception as e:
-        return types.CallToolResult(
-            isError=True, 
-            content=[types.TextContent(type="text", text=f"An error occurred: {str(e)}")]
-        )
-
-# Attach mapped functions to the server instance
-mcp_server.list_tools_handler = on_list_tools
-mcp_server.call_tool_handler = on_call_tool
+        raise ValueError(f"Unknown tool: {name}")
  
+    if not arguments or "prompt" not in arguments:
+        raise ValueError("Error: Prompt was empty.")
+ 
+    prompt = arguments["prompt"]
+ 
+    # URL-encode the string to protect spaces during web-routing
+    encoded_prompt = quote(prompt)
+ 
+    # Pull from Pollinations' image generation endpoint (default safety settings)
+    image_url = f"https://pollinations.ai{encoded_prompt}?enhance=false&safe=false"
+ 
+    # Return Markdown schema syntax to natively display the image in your client's window
+    return [
+        types.TextContent(
+            type="text",
+            text=f"Here is your generated image:\n![Generated Image]({image_url})"
+        )
+    ]
 # Initialize FastAPI application container
 app = FastAPI(title="Pollinations ImageGen MCP Server")
  
@@ -109,5 +89,4 @@ async def messages_endpoint(request: Request):
 @app.get("/")
 async def root():
     return RedirectResponse(url="/docs")
-async def root():
     return RedirectResponse(url="/docs")
