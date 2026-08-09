@@ -1,17 +1,16 @@
 import os
 from urllib.parse import quote
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
-from mcp.server.fastmcp import FastMCP
-import mcp.types as types
+from fastmcp import FastMCP
 
-# Initialize FastMCP - This automatically sets up a FastAPI sub-app and tools
+# Initialize FastMCP directly from its dedicated library
 mcp_server = FastMCP(
     name="free-uncensored-imagegen",
     title="Free Uncensored Image Generator"
 )
 
-# Define your image generation tool using the decorator
+# Define your image generation tool using the standard decorator
 @mcp_server.tool(
     name="generate_image",
     description="Generates an image from a detailed text prompt using free cloud APIs."
@@ -24,7 +23,7 @@ async def generate_image(prompt: str) -> str:
         # URL-encode the prompt string to handle spaces safely
         encoded_prompt = quote(prompt)
         
-        # Build the Pollinations URL with safety filters turned off
+        # Build the Pollinations URL with safety filters explicitly turned off
         image_url = f"https://pollinations.ai{encoded_prompt}?enhance=false&safe=false"
         
         # Return Markdown to instantly render the image inside your local chat UI
@@ -36,8 +35,7 @@ async def generate_image(prompt: str) -> str:
 # Create your main FastAPI application
 app = FastAPI(title="Main API Entrypoint")
 
-# Mount the MCP server's application instance directly into your main FastAPI app
-# This makes it available over HTTP/SSE
+# Mount the FastMCP application instance directly into your main FastAPI app
 app.mount("/mcp", mcp_server.fastapi_app)
 
 @app.get("/")
