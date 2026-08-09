@@ -9,7 +9,7 @@ import mcp.types as types
 
 # Initialize the official low-level core MCP Server instance
 mcp_server = Server("free-uncensored-imagegen")
-sse_transport = SseServerTransport("https://mcp-0go8.onrender.com/")
+sse_transport = SseServerTransport("https://mcp-0go8.onrender.com/sse")
 
 # Handle incoming list_tools requests programmatically
 async def on_list_tools(params) -> types.ListToolsResult:
