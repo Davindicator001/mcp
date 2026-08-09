@@ -7,13 +7,13 @@ from mcp.server import Server
 from mcp.server.sse import SseServerTransport
 import mcp.types as types
 
-# Initialize the official core MCP Server
+# Initialize the low-level base MCP Server 
 mcp_server = Server("free-uncensored-imagegen")
 sse_transport = SseServerTransport("/messages")
 
-# Register the image generation tool
+# CORRECT DECORATOR SPEC: Register the available tools list
 @mcp_server.list_tools()
-async def handle_list_tools():
+async def handle_list_tools() -> list[types.Tool]:
     return [
         types.Tool(
             name="generate_image",
@@ -28,23 +28,25 @@ async def handle_list_tools():
         )
     ]
 
+# CORRECT DECORATOR SPEC: Handle runtime client tool execution
 @mcp_server.call_tool()
-async def handle_call_tool(name: str, arguments: dict):
+async def handle_call_tool(name: str, arguments: dict | None) -> list[types.TextContent]:
     if name != "generate_image":
-        raise ValueError(f"Unknown tool: {name}")
+        raise ValueError(f"Unknown tool request: {name}")
     
-    prompt = arguments.get("prompt")
-    if not prompt:
-        return [types.TextContent(type="text", text="Error: Prompt is empty.")]
+    if not arguments or "prompt" not in arguments:
+        return [types.TextContent(type="text", text="Error: Prompt was missing or empty.")]
+        
+    prompt = arguments["prompt"]
 
     try:
-        # URL-encode the prompt string to handle spaces safely
+        # Safely parse whitespace strings
         encoded_prompt = quote(prompt)
         
-        # Pull from the public Pollinations architecture with filters dropped
+        # Route to the public Pollinations architecture with moderation parameters turned off
         image_url = f"https://pollinations.ai{encoded_prompt}?enhance=false&safe=false"
         
-        # Return Markdown to instantly render the image inside your local chat UI
+        # Return proper types.TextContent mapping to render image markup natively 
         return [
             types.TextContent(
                 type="text", 
