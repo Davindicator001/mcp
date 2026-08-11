@@ -30,7 +30,7 @@ async def generate_image(prompt: str) -> str:
     encoded_prompt = quote(prompt)
 
     # Pull from Pollinations' image generation endpoint (default safety settings)
-    image_url = f"https://pollinations.ai{encoded_prompt}?enhance=false&safe=false"
+    image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?enhance=false&safe=false"
 
     return f"Here is your generated image:\n![Generated Image]({image_url})"
 
