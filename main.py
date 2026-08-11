@@ -5,14 +5,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from mcp.server import MCPServer
 from mcp.server.transport_security import TransportSecuritySettings
 import mcp.types as types
- 
+
 # Initialize the MCP server
 mcp_server = MCPServer("free-uncensored-imagegen")
 
 HF_TOKEN = os.environ.get("HF_TOKEN")
  
 HF_MODEL = "John6666/spicy-realism-nsfw-mix-v30-sdxl"
-HF_API_URL = f"https://api-inference.huggingface.co/models/{HF_MODEL}"
+# Hugging Face deprecated api-inference.huggingface.co in favor of the new
+# router. The old hostname no longer resolves at all (hence "No address
+# associated with hostname" errors) — this is the current endpoint format.
+HF_API_URL = f"https://router.huggingface.co/hf-inference/models/{HF_MODEL}"
  
 # The SSE transport validates the Host header by default (DNS-rebinding
 # protection) and rejects any host not in this list. Add your Render
@@ -85,3 +88,4 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+ 
