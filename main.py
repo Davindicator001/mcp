@@ -33,7 +33,7 @@ async def generate_image(prompt: str) -> types.ImageContent | str:
     url = f"{COLAB_URL}/update"
     params = {"prompt": prompt}
 
-    async with httpx.AsyncClient(timeout=6000.0) as client:
+    async with httpx.AsyncClient(timeout=None) as client:
         try:
             response = await client.get(url, params=params)
         except Exception as e:
