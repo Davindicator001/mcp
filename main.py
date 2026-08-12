@@ -7,7 +7,7 @@ from mcp.server.transport_security import TransportSecuritySettings
 import mcp.types as types
 
 # Initialize the MCP server
-mcp_server = MCPServer("colab-sdxl-imagegen")
+mcp_server = MCPServer("free-uncensored-imagegen")
 
 # UPDATE THIS: Use your actual ngrok URL from the cell output above
 # Example: "https://deserving-reveler-daybed.ngrok-free.dev"
